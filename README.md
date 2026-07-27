@@ -11,6 +11,12 @@ etc.).
 - 🇺🇸 English (current)
 - 🇧🇷 [Português](README.pt-BR.md)
 
+
+## Dependencies
+
+- Python 3.10+
+- Requests (Included in `requirements.txt`)
+
 ## Installation
 
 ```bash

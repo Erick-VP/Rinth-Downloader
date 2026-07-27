@@ -8,6 +8,12 @@ qualquer launcher (TLauncher, MultiMC, instância manual, etc).
 - 🇺🇸 [English](README.md)
 - 🇧🇷 Português (atual)
 
+## Dependências
+
+- Python 3.10+
+- Requests (incluído em `requirements.txt`)
+
+
 ## Instalação
 
 ```bash
