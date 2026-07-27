@@ -11,6 +11,10 @@ from pathlib import Path
 
 import requests
 
+from . import logging_setup
+
+log = logging_setup.get_logger(__name__)
+
 CACHE_DIR = Path.home() / ".modrinth_toolkit_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
@@ -38,7 +42,7 @@ def _pick_algo(hashes: dict) -> str | None:
 def _download_one(entry: dict, dest_root: Path) -> dict:
     """
     entry esperado:
-    {"path": "mods/exemplo.jar", "url": "https://...", "hashes": {"sha1": "...", "sha512": "..."}}
+        {"path": "mods/exemplo.jar", "url": "https://...", "hashes": {"sha1": "...", "sha512": "..."}}
     """
     rel_path = entry["path"]
     url = entry["url"]
@@ -49,7 +53,7 @@ def _download_one(entry: dict, dest_root: Path) -> dict:
     algo = _pick_algo(hashes)
     cache_path = CACHE_DIR / f"{algo}-{hashes[algo]}" if algo else None
 
-    # verifica se existe no cache local (execução anterior)
+    # checa se existe no cache local (de uma execução anterior)
     if cache_path and cache_path.exists():
         shutil.copy(cache_path, dest)
         return {"path": rel_path, "status": "cache", "error": None}
@@ -72,17 +76,17 @@ def _download_one(entry: dict, dest_root: Path) -> dict:
 
             return {"path": rel_path, "status": "ok", "error": None}
 
-        except Exception as e:  # noqa: BLE001 - capturar qualquer falha de rede/IO
+        except Exception as e:  # noqa: BLE001 - captura qualquer falha de rede/IO
             last_err = e
 
     return {"path": rel_path, "status": "fail", "error": str(last_err)}
 
 
 def download_all(entries: list[dict], dest_root: Path,
-    max_workers: int = MAX_WORKERS) -> dict:
+                max_workers: int = MAX_WORKERS) -> dict:
     """
     Baixa todos os arquivos em paralelo. Retorna:
-    {"ok": [...], "cached": [...], "failed": [...]}
+        {"ok": [...], "cached": [...], "failed": [...]}
     """
     dest_root.mkdir(parents=True, exist_ok=True)
     ok, cached, failed = [], [], []
@@ -94,7 +98,9 @@ def download_all(entries: list[dict], dest_root: Path,
         for fut in as_completed(futures):
             done += 1
             res = fut.result()
-            print(f"[{done}/{total}] {res['status'].upper():6s} {res['path']}")
+            log.info(f"[{done}/{total}] {res['status'].upper():6s} {res['path']}")
+            if res["status"] == "fail":
+                log.debug(f"Detalhe da falha em {res['path']}: {res['error']}")
             if res["status"] == "ok":
                 ok.append(res)
             elif res["status"] == "cache":
