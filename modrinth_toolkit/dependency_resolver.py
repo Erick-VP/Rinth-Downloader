@@ -1,17 +1,25 @@
 """
-Resolve recursivamente as dependências obrigatórias ('required') de uma
-'version' do Modrinth. Só é necessário quando o usuário baixa um mod avulso
-(modpacks fechados já vêm com tudo resolvido no modrinth.index.json).
+Resolve recursivamente as dependências de uma 'version' do Modrinth.
+Só é necessário quando o usuário baixa um mod avulso (modpacks fechados já
+vêm com tudo resolvido no modrinth.index.json).
 """
 from . import modrinth_client as api
+from . import logging_setup
+
+log = logging_setup.get_logger(__name__)
 
 
 def resolve_dependencies(version: dict, loader: str, game_version: str,
-    _seen: set | None = None) -> list[dict]:
+                        include_optional: bool = False,
+                        _seen: set | None = None) -> list[dict]:
     """
     Retorna uma lista de {"project_id": ..., "version": {...}} contendo a
-    version original + todas as dependências obrigatórias encontradas,
-    recursivamente, sem duplicatas.
+    version original + todas as dependências encontradas recursivamente,
+    sem duplicatas.
+
+    Por padrão só segue dependências 'required'. Passe include_optional=True
+    pra também baixar as 'optional' (ex: addons/compat que o mod recomenda
+    mas não exige pra funcionar).
     """
     if _seen is None:
         _seen = set()
@@ -24,8 +32,11 @@ def resolve_dependencies(version: dict, loader: str, game_version: str,
 
     result.append({"project_id": version["project_id"], "version": version})
 
+    wanted_types = {"required"} | ({"optional"} if include_optional else set())
+
     for dep in version.get("dependencies", []):
-        if dep.get("dependency_type") != "required":
+        dep_type = dep.get("dependency_type")
+        if dep_type not in wanted_types:
             continue
 
         dep_version = None
@@ -38,12 +49,14 @@ def resolve_dependencies(version: dict, loader: str, game_version: str,
             if candidates:
                 dep_version = candidates[0]
             else:
-                print(
-                    f"  [aviso] dependência obrigatória {dep['project_id']} não tem "
-                    f"build para loader={loader}/mc={game_version}; pulando."
+                log.warning(
+                    f"Dependência {dep_type} '{dep['project_id']}' não tem build "
+                    f"para loader={loader}/mc={game_version}; pulando."
                 )
 
         if dep_version:
-            result.extend(resolve_dependencies(dep_version, loader, game_version, _seen))
+            result.extend(
+                resolve_dependencies(dep_version, loader, game_version, include_optional, _seen)
+            )
 
     return result
