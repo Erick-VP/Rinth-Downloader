@@ -36,11 +36,11 @@ def extract_slug_from_url(url: str) -> str:
     return m.group(1)
 
 
-def resolve_from_link_or_id(link_or_id: str, loader: str, game_version: str) -> ResolvedTarget:
+def list_compatible_versions(link_or_id: str, loader: str, game_version: str) -> tuple[dict, list[dict]]:
     """
-    Aceita um link completo do Modrinth, ou diretamente um slug/id de projeto.
-    Já filtra as versões pelo loader e versão do Minecraft escolhidos e pega
-    a mais recente compatível.
+    Retorna (project, versions) já filtrados por loader + versão do MC,
+    ordenados do mais recente pro mais antigo. Não escolhe nenhuma — quem
+    chama decide (CLI pode listar pro usuário, ou pegar versions[0] direto).
     """
     slug = extract_slug_from_url(link_or_id) if "modrinth.com" in link_or_id else link_or_id
 
@@ -53,8 +53,26 @@ def resolve_from_link_or_id(link_or_id: str, loader: str, game_version: str) -> 
             f"loader={loader!r} e Minecraft={game_version!r}. "
             f"Confira se esse mod/modpack realmente suporta essa combinação."
         )
+    return project, versions
 
-    chosen = versions[0]
+
+def resolve_from_link_or_id(link_or_id: str, loader: str, game_version: str,
+                            version_index: int = 0) -> ResolvedTarget:
+    """
+    Aceita um link completo do Modrinth, ou diretamente um slug/id de projeto.
+    Filtra as versões pelo loader e versão do Minecraft escolhidos.
+    Por padrão pega a mais recente compatível (version_index=0); passe um
+    índice diferente pra escolher outra da lista retornada por
+    list_compatible_versions().
+    """
+    project, versions = list_compatible_versions(link_or_id, loader, game_version)
+
+    if version_index < 0 or version_index >= len(versions):
+        raise IndexError(
+            f"version_index={version_index} fora do range (0 a {len(versions) - 1})."
+        )
+
+    chosen = versions[version_index]
     return ResolvedTarget(
         source="modrinth",
         project_id=project["id"],
@@ -73,6 +91,8 @@ def resolve_from_local_file(path: str) -> ResolvedTarget:
     with zipfile.ZipFile(p) as z:
         with z.open("modrinth.index.json") as f:
             index = json.load(f)
+
+    api.check_index_format(index)
 
     return ResolvedTarget(
         source="local_mrpack",
