@@ -37,14 +37,35 @@ mod precisa, já baixado e verificado por hash.
 
 ```
 modrinth_toolkit/
-├── modrinth_client.py      # wrapper fino da API pública do Modrinth (v2)
-├── resolver.py             # entrada (link/slug/arquivo) -> alvo concreto
-├── dependency_resolver.py  # resolve dependências obrigatórias de mods avulsos
+├── modrinth_client.py      # wrapper da API do Modrinth: rate limit, retry/backoff, checa formatVersion
+├── rate_limiter.py         # limitador reutilizável (também pronto pra CurseForge no futuro)
+├── logging_setup.py        # log em tela (INFO) + arquivo (DEBUG) em ~/.modrinth_toolkit_logs
+├── resolver.py             # entrada (link/slug/arquivo) -> alvo concreto, com listagem de versões
+├── dependency_resolver.py  # resolve dependências (required, e opcional se pedido)
 ├── downloader.py           # download paralelo, hash, retry, cache local
-├── packer.py               # monta a pasta final (overrides + mods baixados)
-└── cli.py                  # interface interativa que amarra tudo
-main.py                     # ponto de entrada
+├── packer.py               # monta a pasta final (overrides + mods baixados, na pasta certa por tipo)
+└── cli.py                  # interativa (input()) e não-interativa (argparse), mesma lógica por baixo
+main.py                     # ponto de entrada; sem args = interativo, com --link/--mrpack = não-interativo
 ```
+
+## Modo não-interativo (automação)
+
+```bash
+# modpack por link
+python main.py --link create-plus --loader neoforge --mc-version 1.21.1 --dest ./instancia
+
+# mod avulso, incluindo dependências opcionais
+python main.py --link sodium --loader fabric --mc-version 1.21.1 --dest ./instancia --include-optional
+
+# a partir de um .mrpack local
+python main.py --mrpack ./Create__6_0_0_Alpha_f.mrpack --dest ./instancia
+```
+
+## Logs
+
+Tudo que acontece fica salvo em `~/.modrinth_toolkit_logs/modrinth_toolkit.log`
+(nível DEBUG, com detalhes de erro que não aparecem na tela). Útil pra
+debugar se algo falhar no meio de um download grande.
 
 ## Fluxos suportados
 
@@ -60,4 +81,3 @@ main.py                     # ponto de entrada
 Cada arquivo baixado é guardado em `~/.modrinth_toolkit_cache/`, indexado
 pelo hash (sha1 ou sha512). Rodar de novo pra um modpack parecido reaproveita
 o que já foi baixado antes.
-
